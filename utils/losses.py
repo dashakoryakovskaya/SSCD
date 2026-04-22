@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import logging
 
 
 # ============================ Base loss components ============================
@@ -197,87 +198,6 @@ class CCCLoss(nn.Module):
         ccc = 2 * rho * x_s * y_s / (torch.pow(x_s, 2) + torch.pow(y_s, 2) + torch.pow(x_m - y_m, 2))
         return 1 - ccc
 
-
-# ============================ Multitask losses (v1) ============================
-class MultiTaskLoss(nn.Module):
-    """
-    Two-branch multitask loss:
-      - Emotion: CrossEntropy
-      - Personality: one of supported regression losses
-    """
-    def __init__(
-        self,
-        weight_emotion=1.0,
-        weight_personality=1.0,
-        emo_weights=None,
-        personality_loss_type="ccc",
-        eps=1e-8,
-        lam_gl=1.0,
-        eps_gl=600,
-        sigma_gl=8,
-    ):
-        super().__init__()
-        self.weight_emotion = weight_emotion
-        self.weight_personality = weight_personality
-
-        # Emotion: CE with optional class weights
-        self.emotion_loss = nn.CrossEntropyLoss(weight=emo_weights)
-
-        # Personality: select by name
-        loss_types = {
-            "ccc": CCCLoss(eps=eps),
-            "mae": MAELoss(),
-            "mse": MSELoss(),
-            "bell": BellLoss(),
-            "logcosh": LogCosh(),
-            "gl": GL(lam=lam_gl, eps=eps_gl, sigma=sigma_gl),
-            "rmse": RMSE(),
-            "rmse_bell": RMBell(),
-            "rmse_logcosh": RMLCosh(),
-            "rmse_gl": RMGL(lam=lam_gl, eps=eps_gl, sigma=sigma_gl),
-            "rmse_bell_logcosh": RMBellLCosh(),
-            "rmse_bell_gl": RMBellGL(lam=lam_gl, eps=eps_gl, sigma=sigma_gl),
-            "bell_logcosh": BellLCosh(),
-            "bell_gl": BellGL(lam=lam_gl, eps=eps_gl, sigma=sigma_gl),
-            "bell_logcosh_gl": BellLCoshGL(),
-            "logcosh_gl": LogCoshGL(lam=lam_gl, eps=eps_gl, sigma=sigma_gl),
-        }
-        if personality_loss_type not in loss_types:
-            raise ValueError(
-                f"Unknown personality_loss_type: {personality_loss_type}. "
-                f"Available: {list(loss_types.keys())}"
-            )
-
-        self.personality_loss = loss_types[personality_loss_type]
-        self.personality_loss_type = personality_loss_type
-
-    def forward(self, outputs, labels):
-        loss = 0.0
-
-        # Emotion (classification)
-        if 'emotion_logits' in outputs and 'emotion' in labels:
-            true_emotion = labels['emotion']
-            pred_emotion = outputs['emotion_logits']
-            loss += self.weight_emotion * self.emotion_loss(pred_emotion, true_emotion)
-
-        # Personality (regression)
-        if 'personality_scores' in outputs and 'personality' in labels:
-            true_personality = labels['personality']
-            pred_personality = outputs['personality_scores']
-
-            if self.personality_loss_type == "ccc":
-                loss_per = 0.0
-                for i in range(5):  # across 5 traits
-                    loss_per += self.personality_loss(true_personality[:, i], pred_personality[:, i])
-                loss += (loss_per) * self.weight_personality
-                # If needed: average across traits -> (loss_per / 5.0)
-            else:
-                loss += self.weight_personality * self.personality_loss(true_personality, pred_personality)
-
-        return loss
-
-
-# ============================ Helpers ============================
 def binarize_with_nan(x, threshold=0.5):
     """Binarize values, preserving NaN positions."""
     nan_mask = torch.isnan(x)
@@ -392,8 +312,13 @@ class MultiTaskLossWithNaN_v2(nn.Module):
                         pred_emotion_confident = pred_emotion_unlabeled[mask_confident]
                         pseudo_labels_confident = pseudo_labels[mask_confident]
                         if self.emotion_loss_type == 'BCE':
+                            num_c = pred_emotion_confident.size(1)
                             pseudo_labels_confident = pseudo_labels_confident.float()
-                        loss += self.ssl_weight_emotion * self.emotion_loss(pred_emotion_confident, pseudo_labels_confident)
+                            loss += self.ssl_weight_emotion * self.emotion_loss(pred_emotion_confident, F.one_hot(pseudo_labels_confident.long(), num_classes=num_c).float())
+                            
+                        
+                        else:
+                            loss += self.ssl_weight_emotion * self.emotion_loss(pred_emotion_confident, pseudo_labels_confident)
 
         # Personality branch (mask/NaN per trait)
         per_mask = labels.get('valid_per', None)
