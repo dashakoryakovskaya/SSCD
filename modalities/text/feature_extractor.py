@@ -20,8 +20,8 @@ class PretrainedTextEmbeddingExtractor:
     ):
         self.device = torch.device(device)
 
-        '''self.tok = AutoTokenizer.from_pretrained(model_name, code_revision='da863dd04a4e5dce6814c6625adfba87b83838aa', trust_remote_code=True)
-        self.enc = AutoModel.from_pretrained(model_name, code_revision='da863dd04a4e5dce6814c6625adfba87b83838aa', trust_remote_code=True).to(self.device).eval()'''
+        self.tok = AutoTokenizer.from_pretrained(model_name, code_revision='da863dd04a4e5dce6814c6625adfba87b83838aa', trust_remote_code=True)
+        self.enc = AutoModel.from_pretrained(model_name, code_revision='da863dd04a4e5dce6814c6625adfba87b83838aa', trust_remote_code=True).to(self.device).eval()
 
         self.fusion, _ = load_fusion_model(
             fusion_ckpt, emo_ckpt, per_ckpt, device=self.device

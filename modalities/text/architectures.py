@@ -7,19 +7,20 @@ import numpy as np
 from .help_layers import TransformerEncoderLayer, CustomMambaBlock
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+
+
 class EmotionMamba(nn.Module):
     def __init__(self, input_dim_emotion=1024, input_dim_personality=1024, hidden_dim=128, out_features=512, mamba_layer_number=2, positional_encoding=True, num_transformer_heads=4, transformer_dropout=0.1, tr_layer_number=1, dropout=0.1, num_emotions=7, num_traits=5):
         super().__init__()
-        
+
         self.hidden_dim = hidden_dim
-        
+
         self.emo_proj = nn.Sequential(
             nn.Linear(input_dim_emotion, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.Dropout(dropout)
         )
-        
+
         self.emotion_encoder = nn.ModuleList([
             CustomMambaBlock(hidden_dim, hidden_dim, dropout=dropout)
             for _ in range(mamba_layer_number)
@@ -47,7 +48,8 @@ class EmotionMamba(nn.Module):
             }
         else:
             return {'emotion_logits': out_emo}
-        
+
+
 class PersonalityMamba(nn.Module):
     def __init__(self, input_dim_emotion=1024, input_dim_personality=1024, hidden_dim=128, out_features=512, mamba_layer_number=2, per_activation="sigmoid", positional_encoding=True, num_transformer_heads=4, tr_layer_number=1, dropout=0.1, num_emotions=7, num_traits=5):
         super().__init__()
@@ -59,7 +61,7 @@ class PersonalityMamba(nn.Module):
             nn.LayerNorm(hidden_dim),
             nn.Dropout(dropout)
         )
-        
+
         self.personality_encoder = nn.ModuleList([
             CustomMambaBlock(hidden_dim, hidden_dim, dropout=dropout)
             for _ in range(mamba_layer_number)
@@ -93,7 +95,8 @@ class PersonalityMamba(nn.Module):
             }
         else:
             return {'personality_scores': self.activation(out_per)}
-        
+
+
 class FusionTransformer(nn.Module):
     def __init__(self, emo_model, per_model, hidden_dim=128, out_features=512, per_activation="sigmoid", positional_encoding=True, num_transformer_heads=4, tr_layer_number=1, dropout=0.1, num_emotions=7, num_traits=5):
         super().__init__()
@@ -167,7 +170,7 @@ class FusionTransformer(nn.Module):
 
         emo_emd = self.emo_proj(emo_features['last_encoder_features'])
         per_emd = self.per_proj(per_features['last_encoder_features'])
-        
+  
         # padding
         max_len = max(emo_emd.shape[1], per_emd.shape[1])
         emo_emd = emo_emd.cpu().detach().numpy()
