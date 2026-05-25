@@ -2,7 +2,7 @@
 import os, logging
 import random
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -40,6 +40,7 @@ def process_predictions(pred_emo, true_emo):
     true_emo = true_emo.cpu().detach().numpy()
     true_emo = np.where(true_emo > 0, 1, 0)[:, 1:].tolist()
     return pred_emo, true_emo
+
 
 @torch.no_grad()
 def evaluate_epoch(model: torch.nn.Module,
@@ -85,6 +86,7 @@ def evaluate_epoch(model: torch.nn.Module,
         metrics["ACC"] = acc_func(tgt, prd)
         metrics["CCC"] = ccc(tgt, prd)
     return metrics
+
 
 def log_and_aggregate_split(name: str,
                             loaders: dict[str, DataLoader],
@@ -132,9 +134,11 @@ def drop_domains_in_batch(batch: dict, config):
                 batch["emotion_logits"][mod] = None
     return batch
 
+
 def stack_core_feats(feat_dict: dict, modal: str) -> torch.Tensor:
     parts = [feat_dict[k] for k in ["last_emo_encoder_features", "last_per_encoder_features"] if k in feat_dict]
     return torch.cat(parts)
+
 
 def custom_collate_fn(batch):
     """Собирает список образцов в единый батч, отбрасывая None (невалидные)."""
@@ -150,10 +154,7 @@ def custom_collate_fn(batch):
     if not filtered_batch:
         return None
 
-    # --------- собираем features ---------
-    features = {}          # modality → Tensor([B, D])
-    metas    = {}          # modality → dict списков «побочных» полей (логиты)
-
+    features = {}
     modalities = filtered_batch[0]["features"].keys()
 
     emo_pred = {}
@@ -172,7 +173,6 @@ def custom_collate_fn(batch):
         emo_pred[m] = torch.stack(emo_logits)
         per_pred[m] = torch.stack(per_logits)
 
-    # --------- labels ---------
     emo = [b["labels"]["emotion"] for b in filtered_batch]
     person = [b["labels"]["personality"] for b in filtered_batch]
     emo = torch.stack(emo)
@@ -188,6 +188,7 @@ def custom_collate_fn(batch):
         "personality_scores": per_pred,
     }
 
+
 def make_dataset_and_loader(
     config,
     split: str,
@@ -197,7 +198,6 @@ def make_dataset_and_loader(
 ):
     """
     Универсальная функция: объединяет датасеты или возвращает один при only_dataset.
-    При объединении train-датасетов — использует WeightedRandomSampler для балансировки.
     """
     if not getattr(config, "datasets", None):
         raise ValueError("⛔ В конфиге не указана секция [datasets].")

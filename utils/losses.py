@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import logging
 
 
-# ============================ Base loss components ============================
 class BellLoss(nn.Module):
     """Bell-shaped exponential loss."""
     def __init__(self):
@@ -51,7 +50,6 @@ class GL(nn.Module):
         return gl.mean()
 
 
-# ============================ Combined loss classes ============================
 class RMBell(nn.Module):
     """RMSE + BellLoss."""
     def __init__(self):
@@ -154,7 +152,6 @@ class LogCoshGL(nn.Module):
         return self.logcosh(p, y) + self.gl(p, y)
 
 
-# ============================ Standard regression losses ============================
 class MAELoss(nn.Module):
     """Mean Absolute Error."""
     def __init__(self):
@@ -198,6 +195,7 @@ class CCCLoss(nn.Module):
         ccc = 2 * rho * x_s * y_s / (torch.pow(x_s, 2) + torch.pow(y_s, 2) + torch.pow(x_m - y_m, 2))
         return 1 - ccc
 
+
 def binarize_with_nan(x, threshold=0.5):
     """Binarize values, preserving NaN positions."""
     nan_mask = torch.isnan(x)
@@ -219,7 +217,6 @@ class MultiTaskLossWithNaN_v2(nn.Module):
         lam_gl: float = 1.0,
         eps_gl: float = 600,
         sigma_gl: float = 8,
-        # SSL weights and thresholds
         ssl_weight_emotion: float = 0.0,
         ssl_weight_personality: float = 0.0,
         ssl_confidence_threshold_pt: float = 0.60,
@@ -241,7 +238,7 @@ class MultiTaskLossWithNaN_v2(nn.Module):
             self.emotion_loss = nn.BCEWithLogitsLoss(weight=emo_weights)
             self.emotion_loss_type = emotion_loss_type
         else:
-            raise ValueError(f"Unknown emotion_loss_type: {emotion_loss_type}")
+            raise ValueError(f"Неизвестный emotion_loss_type: {emotion_loss_type}")
 
         loss_types = {
             "ccc": CCCLoss(eps=eps),
@@ -263,15 +260,13 @@ class MultiTaskLossWithNaN_v2(nn.Module):
         }
         if personality_loss_type not in loss_types:
             raise ValueError(
-                f"Unknown personality_loss_type: {personality_loss_type}. Available: {list(loss_types.keys())}"
+                f"Неизвестный personality_loss_type: {personality_loss_type}. Доступные: {list(loss_types.keys())}"
             )
         self.personality_loss = loss_types[personality_loss_type]
         self.personality_loss_type = personality_loss_type
 
     def forward(self, outputs, labels):
         loss = 0.0
-
-        # Emotion branch (with mask)
         emo_mask = labels.get('valid_emo', None)
         pred_emotion_all = outputs.get('emotion_logits')
         if pred_emotion_all is not None:
@@ -290,7 +285,7 @@ class MultiTaskLossWithNaN_v2(nn.Module):
                     true_emotion = binarize_with_nan(true_emotion, threshold=0)
                 loss += self.weight_emotion * self.emotion_loss(pred_emotion, true_emotion)
 
-        # SSL: emotion pseudo-labels on unlabeled samples
+        # Полуконтролируемая потеря
         if self.ssl_weight_emotion > 0.0 and pred_emotion_all is not None:
             emo_mask = labels.get('valid_emo', None)
             if emo_mask is not None:
@@ -315,12 +310,9 @@ class MultiTaskLossWithNaN_v2(nn.Module):
                             num_c = pred_emotion_confident.size(1)
                             pseudo_labels_confident = pseudo_labels_confident.float()
                             loss += self.ssl_weight_emotion * self.emotion_loss(pred_emotion_confident, F.one_hot(pseudo_labels_confident.long(), num_classes=num_c).float())
-                            
-                        
                         else:
                             loss += self.ssl_weight_emotion * self.emotion_loss(pred_emotion_confident, pseudo_labels_confident)
 
-        # Personality branch (mask/NaN per trait)
         per_mask = labels.get('valid_per', None)
         pred_personality_all = outputs.get('personality_scores')
         if pred_personality_all is not None:
@@ -351,7 +343,7 @@ class MultiTaskLossWithNaN_v2(nn.Module):
                 else:
                     loss += self.weight_personality * self.personality_loss(true_personality, pred_personality)
 
-        # SSL: personality pseudo-labels via BCE on confident values
+        # Полуконтролируемая потеря
         if self.ssl_weight_personality > 0.0 and pred_personality_all is not None:
             per_mask = labels.get('valid_per', None)
             if per_mask is not None:

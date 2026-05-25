@@ -303,7 +303,8 @@ class FusionTransformer(nn.Module):
         else:
             return {'emotion_logits': (emotion_logits+emo_features['emotion_logits'])/2,
                     'personality_scores': (self.activation(personality_scores)+per_features['personality_scores'])/2,}
-        
+
+
 class ModalityProjector(nn.Module):
     def __init__(self, in_dim, out_dim, dropout=0.1):
         super().__init__()
@@ -316,6 +317,7 @@ class ModalityProjector(nn.Module):
 
     def forward(self, x):
         return self.proj(x)
+
 
 class AdapterFusion(nn.Module):
     def __init__(self, hidden_dim, dropout=0.1):
@@ -330,7 +332,7 @@ class AdapterFusion(nn.Module):
 
     def forward(self, x):
         return self.layernorm(x + self.adapter(x))
-    
+
 
 class GuideBank(nn.Module):
     def __init__(self, out_dim, hidden_dim):
@@ -339,9 +341,9 @@ class GuideBank(nn.Module):
 
     def forward(self):
         return self.embeddings
-    
+
+
 class GraphAttentionLayer(nn.Module):
-    """Standard graph attention layer for multimodal fusion."""
     def __init__(self, in_dim, out_dim=None, dropout=0.1, alpha=0.2):
         super(GraphAttentionLayer, self).__init__()
         out_dim = out_dim or in_dim
@@ -375,15 +377,15 @@ class GraphAttentionLayer(nn.Module):
 
 class FeatureSlice(nn.Module):
     """
-    Slice concatenated vector [emo‖pkl]:
-      - mode='both' → return as is
-      - mode='emo'  → take the left half (Emo)
-      - mode='pkl'  → take the right half (PKL)
+    Объединение векторов [emo‖pkl]:
+      - mode='both' → [emo‖pkl]
+      - mode='emo'  → только левая часть (Emo)
+      - mode='pkl'  → только правая часть (PKL)
     """
     def __init__(self, mode: str = "both"):
         super().__init__()
         if mode not in ("both", "emo", "pkl"):
-            raise ValueError("feature_slice must be 'both' | 'emo' | 'pkl'")
+            raise ValueError("mode должна быть 'both' | 'emo' | 'pkl'")
         self.mode = mode
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -391,7 +393,8 @@ class FeatureSlice(nn.Module):
             return x
         half = x.size(-1) // 2
         return x[..., :half] if self.mode == "emo" else x[..., half:]
-        
+
+
 class MultiModalFusionModelWithAblation(nn.Module):
     def __init__(
         self,
@@ -509,8 +512,7 @@ class MultiModalFusionModelWithAblation(nn.Module):
                 emo_repr, _ = self.cross_attn(emo_q, context, context)
                 pkl_repr, _ = self.cross_attn(pkl_q, context, context)
                 emo_repr = emo_repr.squeeze(1)
-                pkl_repr = pkl_repr.squeeze(1)
-                
+                pkl_repr = pkl_repr.squeeze(1)         
 
 
         emo_logit_feats = []

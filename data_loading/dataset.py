@@ -2,7 +2,6 @@
 import os
 import logging
 import torch
-# import whisper
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
@@ -10,12 +9,11 @@ import pickle
 from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
-from torchvision import transforms
-from PIL import Image
+import gc
 
 class DatasetVLM(Dataset):
     """
-    Датасет для детектирования формирования обучающих данных по видео.
+    Датасет для формирования обучающих данных по видео.
     """
 
     def __init__(
@@ -32,7 +30,7 @@ class DatasetVLM(Dataset):
         :param video_dir: Путь к видео
         :param split: "train", "dev" или "test".
         :param vlm: VLM
-        :param subset_size: Если > 0, используется только первые N дивео из CSV (для отладки).
+        :param subset_size: Если > 0, используется только первые N примеров из CSV (для отладки).
         :param dataset_name: Название корпуса
         """
         super().__init__()
@@ -46,12 +44,12 @@ class DatasetVLM(Dataset):
         self.save_feature_path = config.save_feature_path
 
         if self.dataset_name == 'cmu_mosei':
-            self.label_columns = ["Neutral","Anger","Disgust","Fear","Happiness","Sadness","Surprise"]
+            self.label_columns = ["Neutral", "Anger", "Disgust", "Fear", "Happiness", "Sadness", "Surprise"]
         elif self.dataset_name == 'fiv2':
-            self.label_columns = ["openness","conscientiousness","extraversion","agreeableness","non-neuroticism"]
+            self.label_columns = ["openness", "conscientiousness", "extraversion", "agreeableness", "non-neuroticism"]
         else:
-            raise ValueError(f"Название датафрейма {self.dataset_name} не соотвествует целевому!")
-    
+            raise ValueError(f"Название корпуса {self.dataset_name} не соотвествует целевому!")
+
         # Загружаем CSV
         if not os.path.exists(csv_path):
             raise ValueError(f"Ошибка: файл CSV не найден: {csv_path}")
@@ -60,7 +58,6 @@ class DatasetVLM(Dataset):
         self.df = self.df.rename(columns={
             "video_name": "filename",
         })
-        # self.len_labels = len(self.df.diagnosis.tolist())
         if self.subset_size > 0:
             self.need_segment_name = list(set(self.df.filename.tolist()))[:self.subset_size]
             self.df = self.df[self.df.filename.isin(self.need_segment_name)]
@@ -104,48 +101,6 @@ class DatasetVLM(Dataset):
             return len(self.meta)
         else:
             return len(self.need_segment_name)
-
-    def pth_processing(self, fp):
-        class PreprocessInput(torch.nn.Module):
-            def init(self):
-                super(PreprocessInput, self).init()
-
-            def forward(self, x):
-                x = x.to(torch.float32)
-                x = torch.flip(x, dims=(0,))
-                x[0, :, :] -= 91.4953
-                x[1, :, :] -= 103.8827
-                x[2, :, :] -= 131.0912
-                return x
-
-        def get_img_torch(img):
-
-            if self.image_model_type == "emoresnet50" or self.image_model_type == "emo":
-                ttransform = transforms.Compose(
-                    [transforms.PILToTensor(), PreprocessInput()]
-                )
-            elif self.image_model_type == 'resnet18' or self.image_model_type == 'resnet50':
-                ttransform = transforms.Compose(
-                    [
-                        transforms.ToTensor(),
-                        transforms.Normalize(
-                            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                        ),
-                    ]
-                )
-
-            if self.image_model_type != 'clip':
-                img = img.resize(
-                    (self.image_size, self.image_size), Image.Resampling.NEAREST
-                )
-                img = ttransform(img)
-                img = torch.unsqueeze(img, 0).to("cuda")
-            elif self.image_model_type == 'clip':
-                img = self.processor(images=img, return_tensors="pt").to("cuda")
-                img = img['pixel_values']
-            return img
-
-        return get_img_torch(fp)
 
     def find_file_recursive(self, base_dir, filename):
         for root, dirs, files in os.walk(base_dir):
@@ -228,7 +183,6 @@ class DatasetVLM(Dataset):
         """
         Загружает и обрабатывает один элемент датасета (on-the-fly).
         """
-
         for idx, segment_name in enumerate(tqdm(self.need_segment_name)):
             curr_dict = self.get_data(segment_name)
 

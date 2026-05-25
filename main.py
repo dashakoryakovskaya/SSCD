@@ -101,7 +101,7 @@ def main():
 
         train_once(
             config           = base_config,
-            train_loader     = train_loaders,
+            train_loaders     = train_loaders,
             dev_loaders      = dev_loaders,
             test_loaders     = test_loaders,
             metrics_csv_path = csv_file_path,

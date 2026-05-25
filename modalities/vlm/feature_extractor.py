@@ -5,21 +5,20 @@ import io
 import logging
 import numpy as np
 import pandas as pd
-from torch.utils.data import Dataset
 import pickle
 from tqdm import tqdm
-from torchvision import transforms
-from PIL import Image
 import gc
 from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
 from .model_loader import load_fusion_model
 
+
 class CPU_Unpickler(pickle.Unpickler):
     def find_class(self, module, name):
         if module == 'torch.storage' and name == '_load_from_bytes':
             return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
-        else: return super().find_class(module, name)
+        else:
+            return super().find_class(module, name)
 
 
 class PretrainedVLMEmbeddingExtractor:
@@ -34,7 +33,7 @@ class PretrainedVLMEmbeddingExtractor:
     ):
         self.device = torch.device(device)
         
-        '''self.model = Qwen3VLForConditionalGeneration.from_pretrained(
+        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             model_name, 
             dtype="auto", 
             device_map="auto"
@@ -42,7 +41,7 @@ class PretrainedVLMEmbeddingExtractor:
         self.processor = AutoProcessor.from_pretrained(model_name)
         self.model.config.output_hidden_states=True
         self.model.config.text_config.output_hidden_states=True
-        self.model.eval()'''
+        self.model.eval()
 
         self.fusion, _ = load_fusion_model(
             fusion_ckpt, emo_ckpt, per_ckpt, device=self.device
@@ -112,13 +111,13 @@ class PretrainedVLMEmbeddingExtractor:
         else:
             #dataset_dict = {'cmu_mosei': 'CMU-MOSEI', 'fiv2': 'FirstImpressionsV2'}
             #logging.info(f"video_path = {video_path}")
-            
+
             for x in self.meta['{}_{}_seed_42_subset_size_0.pickle'.format(dataset_name, split)]:
                 #logging.info(f"x['video_path'] = {x['video_path']}")
                 if x['video_path'] == video_path:
                     vlm_features = x['vlm'].unsqueeze(0)
                     break
-            
+   
         out = self.fusion(
             emotion_input=vlm_features,
             personality_input=vlm_features,

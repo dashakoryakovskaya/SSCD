@@ -9,16 +9,17 @@ from torch.utils.data import Dataset
 import pickle
 from tqdm import tqdm
 
+
 class CPU_Unpickler(pickle.Unpickler):
     def find_class(self, module, name):
         if module == 'torch.storage' and name == '_load_from_bytes':
             return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
         else: return super().find_class(module, name)
-    
+
 
 class MultimodalDataset(Dataset):
     """
-    Датасет для детектирования формирования обучающих данных по всем модальностям.
+    Датасет для формирования обучающих данных по всем модальностям.
     """
     def __init__(
         self,
@@ -36,33 +37,32 @@ class MultimodalDataset(Dataset):
         :param config: Конфиг
         :param split: "train", "dev" или "test".
         :param modality_feature_extractors
-        :param subset_size: Если > 0, используется только первые N дивео из CSV (для отладки).
+        :param subset_size: Если > 0, используется только первые N примеров из CSV (для отладки).
         :param dataset_name: Название корпуса
         """
         super().__init__()
-        
+
         self.csv_path          = csv_path
         self.video_dir         = video_dir
         self.config            = config
         self.split             = split
         self.dataset_name      = dataset_name
         self.device            = device
-        self.segment_length    = config.counter_need_frames
         self.subset_size       = config.subset_size
         self.average_features  = config.average_features
         self.extractors: dict[str, object] = modality_feature_extractors
 
-        
+
         if self.dataset_name == 'cmu_mosei':
-            self.emotion_columns = ["Neutral","Anger","Disgust","Fear","Happiness","Sadness","Surprise"]
+            self.emotion_columns = ["Neutral", "Anger", "Disgust", "Fear", "Happiness", "Sadness", "Surprise"]
             self.personality_columns  = []
         elif self.dataset_name == 'fiv2':
-            self.personality_columns = ["openness","conscientiousness","extraversion","agreeableness","non-neuroticism"]
+            self.personality_columns = ["openness", "conscientiousness", "extraversion", "agreeableness", "non-neuroticism"]
             self.emotion_columns = []
         else:
-            raise ValueError(f"Название датафрейма {self.dataset_name} не соотвествует целевому!")
-    
-        
+            raise ValueError(f"Название корпуса {self.dataset_name} не соотвествует целевому!")
+
+
         self.save_prepared_data = config.save_prepared_data
         self.save_feature_path  = config.save_feature_path
         self.feature_filename   = (
@@ -72,7 +72,7 @@ class MultimodalDataset(Dataset):
         )
         self.num_emotion = 7
         self.num_personality = 5
-        
+
         # Загружаем CSV
         if not os.path.exists(csv_path):
             raise ValueError(f"Ошибка: файл CSV не найден: {csv_path}")
@@ -83,7 +83,7 @@ class MultimodalDataset(Dataset):
         if self.subset_size > 0:
             self.df = self.df.head(self.subset_size)
             logging.info(f"[DatasetMultiModal] Используем только {len(self.df)} записей (subset_size={self.subset_size}).")
-            
+
         self.meta: list[dict] = []
 
         if self.save_prepared_data:
@@ -96,7 +96,7 @@ class MultimodalDataset(Dataset):
                 self.save_data(self.pickle_path)
         else:
             self.prepare_data()
-            
+
     def save_data(self, filename):
         with open(filename, 'wb') as handle:
             pickle.dump(self.meta, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -111,7 +111,7 @@ class MultimodalDataset(Dataset):
                     self.meta = CPU_Unpickler(handle).load()
         else:
             self.meta = []
-                
+
     def find_file(self, base_dir: str, base_filename: str):
         for root, _, files in os.walk(base_dir):
             for file in files:
@@ -121,19 +121,7 @@ class MultimodalDataset(Dataset):
 
     def aggregate(self, feats, average: bool = None):
         """
-        Unified feature aggregation.
-
-        Args:
-            feats (Union[Tensor, dict, None]): Input features.
-            average (bool): If True — average over time (dim=1) when applicable.
-
-        Returns:
-            Aggregated features or None.
-
-        - If feats is a Tensor with shape [B, T, D] and average=True → average over T.
-        - If average=False → return as is.
-        - If feats is a dict → recurse over values.
-        - If feats is None → return None.
+        Усреднение эмбеддингов по временному измерению.
         """
 
         if average is None:
@@ -154,7 +142,7 @@ class MultimodalDataset(Dataset):
             }
 
         raise TypeError(f"Unsupported feature type: {type(feats)}")
-                
+        
     def prepare_data(self):
         for index, row in tqdm(self.df.iterrows(), desc="Extracting multimodal features"):
             video_path = self.find_file(self.video_dir, row["filename"])
@@ -229,11 +217,9 @@ class MultimodalDataset(Dataset):
 
             self.meta.append(entry)
             torch.cuda.empty_cache()
-    def __len__(self):  
+
+    def __len__(self):
         return len(self.meta)
 
     def __getitem__(self, index):
         return self.meta[index]
-        
-        
-
