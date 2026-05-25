@@ -1,8 +1,5 @@
 # coding: utf-8
-# train_utils.py
-
 import torch
-torch.autograd.set_detect_anomaly(True)
 import logging
 import random
 import numpy as np
@@ -29,10 +26,12 @@ from utils.schedulers import SmartScheduler
 from data_loading.dataset import DatasetVLM
 from sklearn.utils.class_weight import compute_class_weight
 
+
 def infinite_loader(loader):
     while True:
         for batch in loader:
             yield batch
+
 
 def pad_to(x, target_size):
     n_repeat = target_size - x.size(0)
@@ -40,6 +39,7 @@ def pad_to(x, target_size):
         return x
     pad = x[-1:].repeat(n_repeat, *[1 for _ in x.shape[1:]])
     return torch.cat([x, pad], dim=0)
+
 
 def transform_matrix(matrix):
     threshold1 = 1 - 1/7 
@@ -50,39 +50,13 @@ def transform_matrix(matrix):
     result[~mask1] = transformed[~mask1]
     return result
 
+
 def process_predictions(pred_emo, true_emo):
     pred_emo = torch.nn.functional.softmax(pred_emo, dim=1).cpu().detach().numpy()
     pred_emo = transform_matrix(pred_emo).tolist()
     true_emo = true_emo.cpu().detach().numpy()
     true_emo = np.where(true_emo > 0, 1, 0)[:, 1:].tolist()
     return pred_emo, true_emo
-
-def get_smoothed_labels(audio_paths, original_labels, smooth_labels_df, smooth_mask, emotion_columns,  device):
-    """
-    audio_paths: список путей к аудиофайлам
-    smooth_mask: тензор boolean с индексами для сглаживания
-    Возвращает тензор сглаженных меток только для отмеченных примеров
-    """
-
-    # Получаем индексы для сглаживания
-    smooth_indices = torch.where(smooth_mask)[0]
-
-    # Создаем тензор для результатов (такого же размера как оригинальные метки)
-    smoothed_labels = torch.zeros_like(original_labels)
-
-    # print(smooth_labels_df, audio_paths)
-
-    for idx in smooth_indices:
-        audio_path = audio_paths[idx]
-        # Получаем сглаженную метку из вашего DataFrame или другого источника
-        smoothed_label = smooth_labels_df.loc[
-            smooth_labels_df['video_name'] == audio_path[:-4],
-            emotion_columns
-        ].values[0]
-
-        smoothed_labels[idx] = torch.tensor(smoothed_label, device=device)
-
-    return smoothed_labels
 
 
 def custom_collate_fn(batch):
@@ -105,6 +79,7 @@ def custom_collate_fn(batch):
         "label": label_tensor,
     }
 
+
 def get_weights(dataloader):
     emo_train_labels = []
 
@@ -121,7 +96,6 @@ def get_weights(dataloader):
 def make_dataset_and_loader(config, split: str, text_feature_extractor: Type = None, vlm: Type = None, only_dataset: str = None):
     """
     Универсальная функция: объединяет датасеты или возвращает один при only_dataset.
-    При объединении train-датасетов — использует WeightedRandomSampler для балансировки.
     """
     datasets = []
 
@@ -133,7 +107,6 @@ def make_dataset_and_loader(config, split: str, text_feature_extractor: Type = N
             continue
 
         csv_path = dataset_cfg["csv_path"].format(base_dir=dataset_cfg["base_dir"], split=split)
-        # wav_dir  = dataset_cfg["wav_dir"].format(base_dir=dataset_cfg["base_dir"], split=split)
         video_dir  = dataset_cfg["video_dir"].format(base_dir=dataset_cfg["base_dir"], split=split)
 
         logging.info(f"[{dataset_name.upper()}], Split={split}: CSV={csv_path}, Video_DIR={video_dir}")
@@ -162,13 +135,10 @@ def make_dataset_and_loader(config, split: str, text_feature_extractor: Type = N
             collate_fn=custom_collate_fn
         )
     else:
-
         if split == "train":
-            # sampler = WeightedRandomSampler(weights, num_samples=total, replacement=True)
             loader = DataLoader(
                 full_dataset,
                 batch_size=config.batch_size,
-                # sampler=sampler,
                 num_workers=config.num_workers,
                 collate_fn=custom_collate_fn
             )
@@ -293,7 +263,6 @@ def train_once(config, train_loaders, dev_loaders, test_loaders, metrics_csv_pat
         csv_writer.writerow(["split", "epoch", "dataset", "loss", "uar", "mf1", "mean"])
 
 
-    # Seed
     if config.random_seed > 0:
         random.seed(config.random_seed)
         torch.manual_seed(config.random_seed)
@@ -335,7 +304,6 @@ def train_once(config, train_loaders, dev_loaders, test_loaders, metrics_csv_pat
         model = model_cls(
             input_dim_emotion     = config.image_embedding_dim,
             input_dim_personality = config.image_embedding_dim,
-            len_seq               = config.counter_need_frames, 
             hidden_dim            = config.hidden_dim,
             out_features          = config.out_features,
             per_activation        = config.per_activation,
@@ -437,21 +405,25 @@ def train_once(config, train_loaders, dev_loaders, test_loaders, metrics_csv_pat
         emo_weights = get_weights(train_loaders['cmu_mosei'])'''
 
     criterion = MultiTaskLossWithNaN_v2(
-        weight_emotion=cfg.weight_emotion,
-        weight_personality=cfg.weight_pers,
+        weight_emotion=config.weight_emotion,
+        weight_personality=config.weight_pers,
         emo_weights = (torch.FloatTensor(
                 [5.890161, 7.534918, 11.228363, 27.722221, 1.3049748, 5.6189237, 26.639517]
-            ).to(device) if cfg.flag_emo_weight else None),
-        personality_loss_type=cfg.pers_loss_type,
-        emotion_loss_type=cfg.emotion_loss_type,
-        ssl_weight_emotion = cfg.ssl_weight_emotion,
-        ssl_weight_personality = cfg.ssl_weight_personality,
-        ssl_confidence_threshold_emo=cfg.ssl_confidence_threshold_emo,
-        ssl_confidence_threshold_pt=cfg.ssl_confidence_threshold_pt,
+            ).to(device) if config.flag_emo_weight else None),
+        personality_loss_type=config.pers_loss_type,
+        emotion_loss_type=config.emotion_loss_type,
+        ssl_weight_emotion = config.ssl_weight_emotion,
+        ssl_weight_personality = config.ssl_weight_personality,
+        ssl_confidence_threshold_emo=config.ssl_confidence_threshold_emo,
+        ssl_confidence_threshold_pt=config.ssl_confidence_threshold_pt,
         ).to(device)
 
     # LR Scheduler
-    steps_per_epoch = sum(1 for batch in train_loaders['cmu_mosei'] if batch is not None)
+    if model_stage == 'personality':
+        steps_per_epoch = len(train_loaders['fiv2'])
+    else:
+        steps_per_epoch = len(train_loaders['cmu_mosei'])
+    # steps_per_epoch = sum(1 for batch in train_loaders['cmu_mosei'] if batch is not None)
     scheduler = SmartScheduler(
         scheduler_type=scheduler_type,
         optimizer=optimizer,
@@ -475,6 +447,7 @@ def train_once(config, train_loaders, dev_loaders, test_loaders, metrics_csv_pat
             total_samples = 0
             total_preds_emo = []
             total_targets_emo = []
+            logging.info(f"\n===len train_loaders cmu_mosei {len(train_loaders['cmu_mosei'])} ===\n model_stage{model_stage}")
 
             for batch in tqdm(dataloader):
                 if batch is None:
