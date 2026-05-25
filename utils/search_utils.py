@@ -8,14 +8,13 @@ from typing import Any
 
 import numpy as np
 
-# ── Metric display order (priority first, then secondary) ───────────
 METRIC_ORDER = [
     "mean_combo",
-    "mean_emo", "mUAR", "mF1",          # emotion block
-    "mean_pkl", "ACC", "CCC",           # personality block
+    "mean_emo", "mUAR", "mF1",
+    "mean_pkl", "ACC", "CCC",
 ]
 
-# ──────────────────────────── Helpers ───────────────────────────────
+
 def _pick_score(metrics: dict, metric_name: str = "mean_emo") -> float:
     """Safely extract a metric value for selection, otherwise return 0."""
     return float(metrics.get(metric_name, 0.0))
@@ -71,7 +70,6 @@ def format_result_box_dual(step_num: int,
     return "\n".join(box)
 
 
-# ─────────────────────────── Greedy search ──────────────────────────
 def greedy_search(
     base_config,
     train_loader,
@@ -170,7 +168,6 @@ def greedy_search(
     logging.info("Done! Greedy search finished.")
 
 
-# ────────────────────────── Exhaustive search ────────────────────────
 def exhaustive_search(
     base_config,
     train_loader,
@@ -239,7 +236,6 @@ def exhaustive_search(
     return best_score, best_config
 
 
-# ────────────────────────── Dataset logging ──────────────────────────
 def _log_dataset_metrics(metrics: dict, file_path: str, label: str = "dev") -> None:
     if "by_dataset" not in metrics:
         return

@@ -1,20 +1,12 @@
 from sklearn.metrics import classification_report, mean_absolute_error
 import numpy as np
 
+
 def mf1(targets: list[np.ndarray] | np.ndarray,
                          predicts: list[np.ndarray] | np.ndarray,
                          return_scores: bool = False) -> float | tuple[float, list[float]]:
-    """Calculates mean Macro F1 score (emotional multilabel mMacroF1)
-
-    Args:
-        targets: Targets array (ground truth)
-        predicts: Predicts array (model predictions)
-        return_scores: If True, returns both mean and per-class scores
-
-    Returns:
-        float: Mean Macro F1 score across all classes
-        or
-        tuple[float, list[float]]: If return_scores=True, returns (mean, per_class_scores)
+    """
+    Средняя взвешенная F1-мера
     """
     targets = np.array(targets)
     predicts = np.array(predicts)
@@ -33,17 +25,8 @@ def mf1(targets: list[np.ndarray] | np.ndarray,
 def uar(targets: list[np.ndarray] | np.ndarray,
                     predicts: list[np.ndarray] | np.ndarray,
                     return_scores: bool = False) -> float | tuple[float, list[float]]:
-    """Calculates mean Unweighted Average Recall (emotional multilabel mUAR)
-
-    Args:
-        targets: Targets array (ground truth)
-        predicts: Predicts array (model predictions)
-        return_scores: If True, returns both mean and per-class scores
-
-    Returns:
-        float: Mean UAR across all classes
-        or
-        tuple[float, list[float]]: If return_scores=True, returns (mean, per_class_scores)
+    """
+    Средняя невзвешенная точность
     """
     targets = np.array(targets)
     predicts = np.array(predicts)
@@ -58,20 +41,22 @@ def uar(targets: list[np.ndarray] | np.ndarray,
         return np.mean(uar_scores), uar_scores
     return np.mean(uar_scores)
 
+
 def acc_func(trues, preds):
-    # print('acc', trues, preds)
+    """
+    Точность
+    """
     acc = []
     for i in range(5):
         acc.append(mean_absolute_error(trues[:, i], preds[:, i]))
     acc = 1 - np.asarray(acc)
     return np.mean(acc)
 
+
 def ccc(y_true, y_pred):
     """
-    This function calculates loss based on concordance correlation coefficient of two series: 'ser1' and 'ser2'
-    TensorFlow methods are used
+    Коэффициент корреляции конкордации
     """
-
     y_true_mean = np.mean(y_true)
     y_pred_mean = np.mean(y_pred)
 
