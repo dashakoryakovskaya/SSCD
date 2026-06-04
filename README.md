@@ -38,4 +38,13 @@
 |             | UAR     | MF1     | mACC    | mCCC    |
 |Текст        | 62.52   | 61.03   | 88.80   | 25.44   |
 |Видео        | 61.97   | 56.97   | 91.12   | 65.91   |
-|Текст + Видео| 63.04   | 62.01   | 86.44   | 30.23   |
+|Текст + Видео| 63.04   | 62.01   | 86.44   | 30.23   |  
+
+---
+## Прототип на Gradio
+
+
+https://github.com/user-attachments/assets/c772f3fb-c0cb-4cd6-aba0-53451a8b642e
+
+
+[Ссылка](https://huggingface.co/spaces/dashakoryakovskaya/SSCD)  
