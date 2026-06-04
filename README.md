@@ -42,5 +42,9 @@
 
 ---
 ## Прототип на Gradio
-https://github.com/user-attachments/assets/c498fbba-9f08-40c4-9a68-f87e9e49cd3e
+
+
+https://github.com/user-attachments/assets/c772f3fb-c0cb-4cd6-aba0-53451a8b642e
+
+
 [Ссылка](https://huggingface.co/spaces/dashakoryakovskaya/SSCD)  
